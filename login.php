@@ -3,15 +3,15 @@
 	include("./settings/connect_datebase.php");
 	
 	if (isset($_SESSION['user'])) {
-		if($_SESSION['user'] != -1) {
-			
-			$user_query = $mysqli->query("SELECT * FROM `users` WHERE `id` = ".$_SESSION['user']);
-			while($user_read = $user_query->fetch_row()) {
-				if($user_read[3] == 0) header("Location: user.php");
-				else if($user_read[3] == 1) header("Location: admin.php");
-			}
+		if (!isset($_SESSION['session_token'])) {
+			session_unset();
+			session_destroy();
+			session_start();
+		} else if ($_SESSION['user'] != -1) {
+			header("Location: user.php");
+			exit();
 		}
- 	}
+	}
 ?>
 <html>
 	<head> 
@@ -34,19 +34,26 @@
 		<div class="space"> </div>
 		<div class="main">
 			<div class="content">
-				<div class = "login">
-					<div class="name">Авторизация</div>
-				
-					<div class = "sub-name">Логин:</div>
-					<input name="_login" type="text" placeholder="" onkeypress="return PressToEnter(event)"/>
-					<div class = "sub-name">Пароль:</div>
-					<input name="_password" type="password" placeholder="" onkeypress="return PressToEnter(event)"/>
-					
-					<a href="regin.php">Регистрация</a>
-					<br><a href="recovery.php">Забыли пароль?</a>
-					<input type="button" class="button" value="Войти" onclick="LogIn()"/>
-					<img src = "img/loading.gif" class="loading"/>
-				</div>
+			<div class="login">
+            <div class="name">Авторизация</div>
+
+            <div class="sub-name">Логин:</div>
+            <input name="_login" type="text" placeholder=""/>
+
+            <div class="sub-name">Пароль:</div>
+            <input name="_password" type="password" placeholder=""/>
+
+            <a href="regin.php">Регистрация</a>
+            <br><a href="recovery.php">Забыли пароль?</a>
+            <input type="button" class="button" value="Войти" onclick="LogIn()"/>
+            <img src="img/loading.gif" class="loading" style="display: none;"/>
+
+            <div id="codeVerification" style="display: none;">
+                <div class="sub-name">Введите код из почты:</div>
+                <input name="_code" type="text" placeholder="6-значный код"/>
+                <input type="button" class="button" value="Подтвердить" onclick="VerifyCode()"/>
+            </div>
+        </div>
 				
 				<div class="footer">
 					© КГАПОУ "Авиатехникум", 2020
@@ -57,65 +64,95 @@
 		</div>
 		
 		<script>
-			function LogIn() {
-				var loading = document.getElementsByClassName("loading")[0];
-				var button = document.getElementsByClassName("button")[0];
-				
-				var _login = document.getElementsByName("_login")[0].value;
-				var _password = document.getElementsByName("_password")[0].value;
-				loading.style.display = "block";
-				button.className = "button_diactive";
-				
-				var data = new FormData();
-				data.append("login", _login);
-				data.append("password", _password);
-				
-				// AJAX запрос
-				$.ajax({
-					url         : 'ajax/login_user.php',
-					type        : 'POST', // важно!
-					data        : data,
-					cache       : false,
-					dataType    : 'html',
-					// отключаем обработку передаваемых данных, пусть передаются как есть
-					processData : false,
-					// отключаем установку заголовка типа запроса. Так jQuery скажет серверу что это строковой запрос
-					contentType : false, 
-					// функция успешного ответа сервера
-					success: function (_data) {
-						console.log("Авторизация прошла успешно, id: " +_data);
-						if(_data == "") {
-							loading.style.display = "none";
-							button.className = "button";
-							alert("Логин или пароль не верный.");
-						} else {
-							localStorage.setItem("token", _data);
-							location.reload();
-							loading.style.display = "none";
-							button.className = "button";
-						}
-					},
-					// функция ошибки
-					error: function( ){
-						console.log('Системная ошибка!');
-						loading.style.display = "none";
-						button.className = "button";
-					}
-				});
-			}
-			
-			function PressToEnter(e) {
-				if (e.keyCode == 13) {
-					var _login = document.getElementsByName("_login")[0].value;
-					var _password = document.getElementsByName("_password")[0].value;
-					
-					if(_password != "") {
-						if(_login != "") {
-							LogIn();
-						}
-					}
-				}
-			}
+			let userLatitude = null;
+    let userLongitude = null;
+
+    function getUserLocation(callback) {
+        $.get("https://ipwho.is/", function(data) {
+            if (data.success) {
+                userLatitude = data.latitude;
+                userLongitude = data.longitude;
+                console.log("Координаты по IPWhois:", userLatitude, userLongitude);
+            } else {
+                console.warn("Не удалось определить местоположение.");
+            }
+            callback();
+        }, "json");
+    }
+
+    function LogIn() {
+        let _login = document.getElementsByName("_login")[0].value;
+        let _password = document.getElementsByName("_password")[0].value;
+        let loading = document.getElementsByClassName("loading")[0];
+
+        loading.style.display = "block";
+
+        getUserLocation(function () {
+            $.ajax({
+                url: 'ajax/login_user.php',
+                type: 'POST',
+                data: { 
+                    login: _login, 
+                    password: _password,
+                    latitude: userLatitude, 
+                    longitude: userLongitude 
+                },
+                success: function (response) {
+                    console.log("Ответ сервера (login_user.php):", response);
+                    loading.style.display = "none";
+
+                    if (response === "error") {
+                        alert("Неверные данные!");
+                    } else if (response === "expired") {
+                        alert("Ваш пароль устарел. Смените его.");
+                        window.location.href = "change_password.php";
+                    } else if (response === "code_required") {
+                        alert("Код отправлен на почту!");
+                        document.getElementById("codeVerification").style.display = "block";
+                    } else if (response === "success") {
+                        alert("Авторизация успешна!");
+                        window.location.href = "user.php";
+                    } else {
+                        alert("Неизвестная ошибка: " + response);
+                    }
+                },
+                error: function (xhr) {
+                    console.error("Ошибка сервера:", xhr.responseText);
+                    loading.style.display = "none";
+                    alert("Ошибка сервера!");
+                }
+            });
+        });
+    }
+
+    function VerifyCode() {
+        let _code = document.getElementsByName("_code")[0].value;
+
+        $.ajax({
+            url: 'ajax/verify_code.php',
+            type: 'POST',
+            data: { code: _code },
+            success: function (response) {
+                console.log("Ответ сервера (verify_code.php):", response);
+
+                if (response.trim() === "success") {
+                    alert("Авторизация успешна!");
+                    window.location.href = "user.php";
+                } else if (response.trim() === "error_invalid_code") {
+                    alert("Неверный код! Попробуйте снова.");
+                } else if (response.trim() === "error_no_stored_code") {
+                    alert("Код не был найден. Войдите заново.");
+                    window.location.href = "login.php";
+                } else {
+                    alert("⚠️ Неизвестная ошибка!");
+                }
+            },
+            error: function (xhr) {
+                console.error("Ошибка сервера:", xhr.responseText);
+                alert("Ошибка при проверке кода!");
+            }
+        });
+    }
 			
 		</script>
 	</body>

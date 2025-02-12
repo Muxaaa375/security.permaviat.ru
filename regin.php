@@ -2,16 +2,13 @@
 	session_start();
 	include("./settings/connect_datebase.php");
 	
-	if (isset($_SESSION['user'])) {
-		if($_SESSION['user'] != -1) {
-			
-			$user_query = $mysqli->query("SELECT * FROM `users` WHERE `id` = ".$_SESSION['user']);
-			while($user_read = $user_query->fetch_row()) {
-				if($user_read[3] == 0) header("Location: user.php");
-				else if($user_read[3] == 1) header("Location: admin.php");
-			}
-		}
- 	}
+    if (isset($_SESSION['user']) && $_SESSION['user'] != -1) {
+        $user_query = $mysqli->query("SELECT * FROM `users` WHERE `id` = " . $_SESSION['user']);
+        while ($user_read = $user_query->fetch_row()) {
+            if ($user_read[3] == 0) header("Location: user.php");
+            else if ($user_read[3] == 1) header("Location: admin.php");
+        }
+    }
 ?>
 <html>
 	<head> 
@@ -34,20 +31,20 @@
 		<div class="space"> </div>
 		<div class="main">
 			<div class="content">
-				<div class = "login">
-					<div class="name">Регистрация</div>
-				
-					<div class = "sub-name">Логин:</div>
-					<input name="_login" type="text" placeholder="" onkeypress="return PressToEnter(event)"/>
-					<div class = "sub-name">Пароль:</div>
-					<input name="_password" type="password" placeholder="" onkeypress="return PressToEnter(event)"/>
-					<div class = "sub-name">Повторите пароль:</div>
-					<input name="_passwordCopy" type="password" placeholder="" onkeypress="return PressToEnter(event)"/>
-					
-					<a href="login.php">Вернуться</a>
-					<input type="button" class="button" value="Зайти" onclick="RegIn()" style="margin-top: 0px;"/>
-					<img src = "img/loading.gif" class="loading" style="margin-top: 0px;"/>
-				</div>
+			<div class="login">
+            <div class="name">Регистрация</div>
+
+            <div class="sub-name">Логин:</div>
+            <input name="_login" type="text" placeholder="" onkeypress="return PressToEnter(event)"/>
+            <div class="sub-name">Пароль:</div>
+            <input name="_password" type="password" placeholder="" onkeypress="return PressToEnter(event)"/>
+            <div class="sub-name">Повторите пароль:</div>
+            <input name="_passwordCopy" type="password" placeholder="" onkeypress="return PressToEnter(event)"/>
+
+            <a href="login.php">Вернуться</a>
+            <input type="button" class="button" value="Зарегистрироваться" onclick="RegIn()" style="margin-top: 0px;"/>
+            <img src="img/loading.gif" class="loading" style="margin-top: 0px; display: none;"/>
+        </div>
 				
 				<div class="footer">
 					© КГАПОУ "Авиатехникум", 2020
