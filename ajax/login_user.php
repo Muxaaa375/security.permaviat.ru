@@ -1,10 +1,6 @@
 <?php
-// login_user.php
-
-// Начинаем сессию и проверяем, что cookies разрешены
 session_start();
 if (!isset($_COOKIE[session_name()])) {
-    // Если куки не получены, выводим сообщение и завершаем выполнение
     echo "error: cookies_required";
     exit;
 }
@@ -30,6 +26,9 @@ $longitude = isset($_POST['longitude']) ? floatval($_POST['longitude']) : null;
 
 // Проверяем пользователя в базе по email (поле login)
 $query = $mysqli->prepare("SELECT id, password, password_changed_at, last_latitude, last_longitude FROM users WHERE login = ?");
+if (!$query) {
+    die("Ошибка подготовки запроса: " . $mysqli->error); // Выведет причину
+}
 $query->bind_param("s", $login);
 $query->execute();
 $query->bind_result($id, $hashed_password, $password_changed_at, $last_lat, $last_lon);
@@ -73,7 +72,6 @@ if (!is_null($last_lat) && !is_null($last_lon) && !is_null($latitude) && !is_nul
 session_regenerate_id(true);
 $new_session_token = session_id();
 
-// Сохраняем данные в сессии
 $_SESSION['user']          = $id;
 $_SESSION['session_token'] = $new_session_token;
 
@@ -86,8 +84,7 @@ if (!is_null($latitude) && !is_null($longitude) && $latitude !== 0.0 && $longitu
 }
 
 if ($verification_needed) {
-    // Если требуется дополнительная проверка – генерируем 6-значный код, сохраняем его в сессии и отправляем на почту
-    $code = rand(100000, 999999);
+        $code = rand(100000, 999999);
     $_SESSION['auth_code']    = $code;
     $_SESSION['pending_user'] = $id;
     
@@ -119,7 +116,6 @@ if ($verification_needed) {
         echo "error: " . $mail->ErrorInfo;
     }
 } else {
-    // Если дополнительная проверка не требуется – авторизуем сразу
     echo "success";
 }
 ?>
