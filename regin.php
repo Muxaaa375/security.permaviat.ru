@@ -59,8 +59,27 @@
     var button = document.getElementsByClassName("button")[0];
 
     function CheckPassword(value) {
-        let regex = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{9,}$/;
-        return regex.test(value);
+        if (value.length <= 8) {
+            alert("Пароль должен содержать более 8 символов.");
+            return false;
+        }
+        if (!/[A-Z]/.test(value)) {
+            alert("Пароль должен содержать хотя бы одну заглавную букву.");
+            return false;
+        }
+        if (!/[a-z]/.test(value)) {
+            alert("Пароль должен содержать хотя бы одну строчную букву.");
+            return false;
+        }
+        if (!/\d/.test(value)) {
+            alert("Пароль должен содержать хотя бы одну цифру.");
+            return false;
+        }
+        if (!/[@$!%*?&#^()_+\-=\[\]{};':"\\|,.<>\/]/.test(value)) {
+            alert("Пароль должен содержать хотя бы один специальный символ.");
+            return false;
+        }
+        return true;
     }
 
     function RegIn() {
@@ -73,8 +92,8 @@
             return;
         }
 
-        if (_password === "") {
-            alert("Введите пароль.");
+        if (_password === "" || _passwordCopy === "") {
+            alert("Введите пароль и его подтверждение.");
             return;
         }
 
@@ -84,8 +103,7 @@
         }
 
         if (!CheckPassword(_password)) {
-            alert("Пароль должен содержать более 8 символов, заглавную букву, цифру и специальный символ.");
-            return;
+            return; 
         }
 
         loading.style.display = "block";
@@ -100,21 +118,24 @@
             type: 'POST',
             data: data,
             cache: false,
-            dataType: 'html',
+            dataType: 'text',
             processData: false,
             contentType: false,
             success: function (_data) {
-                console.log("Регистрация успешна, id: " + _data);
-                if (_data == -1) {
+                console.log("Ответ сервера:", _data);
+                if (_data.startsWith("error: ")) {
+                    var errorMsg = _data.split("error: ")[1];
+                    alert(errorMsg);
+                } else if (_data == -1) {
                     alert("Пользователь с таким логином уже существует.");
-                    loading.style.display = "none";
-                    button.classList.remove("button_diactive");
                 } else {
                     location.reload();
                 }
+                loading.style.display = "none";
+                button.classList.remove("button_diactive");
             },
             error: function () {
-                console.log('Системная ошибка!');
+                alert('Ошибка соединения с сервером.');
                 loading.style.display = "none";
                 button.classList.remove("button_diactive");
             }

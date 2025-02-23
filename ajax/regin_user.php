@@ -6,28 +6,45 @@ $login = trim($_POST['login']);
 $password = $_POST['password'];
 
 function isValidPassword($password) {
-    return preg_match('/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{9,}$/', $password);
+    if (strlen($password) <= 8) {
+        return "Пароль должен содержать более 8 символов.";
+    }
+    if (!preg_match('/[A-Z]/', $password)) {
+        return "Пароль должен содержать хотя бы одну заглавную букву.";
+    }
+    if (!preg_match('/[a-z]/', $password)) {
+        return "Пароль должен содержать хотя бы одну строчную букву.";
+    }
+    if (!preg_match('/\d/', $password)) {
+        return "Пароль должен содержать хотя бы одну цифру.";
+    }
+    if (!preg_match('/[@$!%*?&#^()_+\-=\[\]{};:\'"\\\\|,.<>\/]/', $password)) {
+        return "Пароль должен содержать хотя бы один специальный символ.";
+    }
+    return true;
 }
-
-if (!isValidPassword($password)) {
-    echo "error: invalid_password";
+$passwordCheck = isValidPassword($password);
+if ($passwordCheck !== true) {
+    echo "error: " . $passwordCheck;
     exit;
 }
 
-$query_user = $mysqli->query("SELECT * FROM `users` WHERE `login`='" . $mysqli->real_escape_string($login) . "'");
+$stmt = $mysqli->prepare("SELECT * FROM `users` WHERE `login` = ?");
+$stmt->bind_param("s", $login);
+$stmt->execute();
+$query_user = $stmt->get_result();
 $id = -1;
 
-if ($query_user->fetch_row()) {
+if ($query_user->num_rows > 0) {
     echo $id;
 } else {
-    // Хешируем пароль
     $hashed_password = password_hash($password, PASSWORD_BCRYPT);
 
     $stmt = $mysqli->prepare("INSERT INTO `users` (`login`, `password`, `roll`) VALUES (?, ?, 0)");
     $stmt->bind_param("ss", $login, $hashed_password);
     $stmt->execute();
 
-    $stmt = $mysqli->prepare("SELECT `id` FROM `users` WHERE `login`=?");
+    $stmt = $mysqli->prepare("SELECT `id` FROM `users` WHERE `login` = ?");
     $stmt->bind_param("s", $login);
     $stmt->execute();
     $stmt->bind_result($id);
