@@ -4,8 +4,6 @@ if (!isset($_COOKIE[session_name()])) {
     echo "error: cookies_required";
     exit;
 }
-
-// Подключаем базу данных; файл находится в папке settings, которая лежит на уровень выше
 include __DIR__ . '/../settings/connect_datebase.php';
 
 // Подключаем файлы PHPMailer из локальной директории, которая находится на уровень выше
@@ -27,7 +25,7 @@ $longitude = isset($_POST['longitude']) ? floatval($_POST['longitude']) : null;
 // Проверяем пользователя в базе по email (поле login)
 $query = $mysqli->prepare("SELECT id, password, password_changed_at, last_latitude, last_longitude FROM users WHERE login = ?");
 if (!$query) {
-    die("Ошибка подготовки запроса: " . $mysqli->error); // Выведет причину
+    die("Ошибка подготовки запроса: " . $mysqli->error); 
 }
 $query->bind_param("s", $login);
 $query->execute();
@@ -39,7 +37,6 @@ if (!$id || !password_verify($password, $hashed_password)) {
     echo "error";
     exit;
 }
-
 // Проверяем, истёк ли срок действия пароля
 $today        = new DateTime();
 $passwordDate = new DateTime($password_changed_at);
@@ -49,7 +46,6 @@ if ($interval >= $N_DAYS) {
     echo "expired";
     exit;
 }
-
 // Функция для вычисления расстояния между координатами (в км)
 function getDistance($lat1, $lon1, $lat2, $lon2) {
     $R    = 6371;
@@ -67,8 +63,6 @@ if (!is_null($last_lat) && !is_null($last_lon) && !is_null($latitude) && !is_nul
         $verification_needed = true;
     }
 }
-
-// Регенерируем ID сессии, чтобы предотвратить фиксацию, и получаем новый session_token
 session_regenerate_id(true);
 $new_session_token = session_id();
 

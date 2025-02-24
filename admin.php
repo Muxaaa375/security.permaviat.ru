@@ -29,7 +29,7 @@
 			<a href=#><img src = "img/logo1.png"/></a>
 			<div class="name">
 				<a href="index.php">
-					<div class="subname">БЗОПАСНОСТЬ  ВЕБ-ПРИЛОЖЕНИЙ</div>
+					<div class="subname">БЕЗОПАСНОСТЬ  ВЕБ-ПРИЛОЖЕНИЙ</div>
 					Пермский авиационный техникум им. А. Д. Швецова
 				</a>
 			</div>

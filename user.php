@@ -1,21 +1,40 @@
 <?php
-	session_start();
-	include("./settings/connect_datebase.php");
-	
-	if (isset($_SESSION['user'])) {
-		if($_SESSION['user'] == -1) {
-			header("Location: login.php");
-		} else {
-			// проверяем пользователя, если админ выкидываем на админа
-			$user_to_query = $mysqli->query("SELECT `roll` FROM `users` WHERE `id` = ".$_SESSION['user']);
-			$user_to_read = $user_to_query->fetch_row();
-			
-			if($user_to_read[0] == 1) header("Location: login.php");
-		}
- 	} else header("Location: login.php");
+session_start();
+include("./settings/connect_datebase.php");
 
-
-
+if (!isset($_SESSION['user'])) {
+    header("Location: login.php");
+    exit();
+}
+if (!isset($_SESSION['session_token'])) {
+    header("Location: login.php");
+    exit();
+}
+$user_id = $_SESSION['user'];
+$current_session_token = $_SESSION['session_token'];
+$stmt = $mysqli->prepare("SELECT session_token, roll, login FROM users WHERE id = ?");
+if (!$stmt) {
+    header("Location: login.php");
+    exit();
+}
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$stmt->bind_result($db_session_token, $user_roll, $user_login);
+if (!$stmt->fetch()) {
+    $stmt->close();
+    header("Location: login.php");
+    exit();
+}
+$stmt->close();
+if ($current_session_token !== $db_session_token) {
+    session_destroy();
+    header("Location: login.php?error=duplicate_login");
+    exit();
+}
+if ($user_roll == 1) {
+    header("Location: login.php");
+    exit();
+}
 ?>
 <!DOCTYPE HTML>
 <html>
@@ -34,7 +53,7 @@
 			<a href=#><img src = "img/logo1.png"/></a>
 			<div class="name">
 				<a href="index.php">
-					<div class="subname">БЗОПАСНОСТЬ  ВЕБ-ПРИЛОЖЕНИЙ</div>
+					<div class="subname">БЕЗОПАСНОСТЬ  ВЕБ-ПРИЛОЖЕНИЙ</div>
 					Пермский авиационный техникум им. А. Д. Швецова
 				</a>
 			</div>
