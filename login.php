@@ -12,6 +12,7 @@
 			exit();
 		}
 	}
+
 ?>
 <html>
 	<head> 
@@ -64,7 +65,7 @@
 		</div>
 		
 		<script>
-			let userLatitude = null;
+    let userLatitude = null;
     let userLongitude = null;
 
     function getUserLocation(callback) {
@@ -81,78 +82,78 @@
     }
 
     function LogIn() {
-        let _login = document.getElementsByName("_login")[0].value;
-        let _password = document.getElementsByName("_password")[0].value;
-        let loading = document.getElementsByClassName("loading")[0];
-
-        loading.style.display = "block";
-
-        getUserLocation(function () {
-            $.ajax({
-                url: 'ajax/login_user.php',
-                type: 'POST',
-                data: { 
-                    login: _login, 
-                    password: _password,
-                    latitude: userLatitude, 
-                    longitude: userLongitude 
-                },
-                success: function (response) {
-                    console.log("Ответ сервера (login_user.php):", response);
-                    loading.style.display = "none";
-
-                    if (response === "error") {
-                        alert("Неверные данные!");
-                    } else if (response === "expired") {
-                        alert("Ваш пароль устарел. Смените его.");
-                        window.location.href = "change_password.php";
-                    } else if (response === "code_required") {
-                        alert("Код отправлен на почту!");
-                        document.getElementById("codeVerification").style.display = "block";
-                    } else if (response === "success") {
-                        alert("Авторизация успешна!");
-                        window.location.href = "user.php";
-                    } else {
-                        alert("Неизвестная ошибка: " + response);
-                    }
-                },
-                error: function (xhr) {
-                    console.error("Ошибка сервера:", xhr.responseText);
-                    loading.style.display = "none";
-                    alert("Ошибка сервера!");
-                }
-            });
-        });
-    }
-
-    function VerifyCode() {
-        let _code = document.getElementsByName("_code")[0].value;
-
+    let _login = document.getElementsByName("_login")[0].value;
+    let _password = document.getElementsByName("_password")[0].value;
+    let loading = document.getElementsByClassName("loading")[0];
+    loading.style.display = "block";
+    getUserLocation(function () {
         $.ajax({
-            url: 'ajax/verify_code.php',
+            url: 'ajax/login_user.php',
             type: 'POST',
-            data: { code: _code },
+            data: { 
+                login: _login, 
+                password: _password,
+                latitude: userLatitude, 
+                longitude: userLongitude 
+            },
             success: function (response) {
-                console.log("Ответ сервера (verify_code.php):", response);
-
-                if (response.trim() === "success") {
+                console.log("Ответ сервера (login_user.php):", response);
+                loading.style.display = "none";
+                if (response === "error") {
+                    alert("Неверные данные!");
+                } else if (response === "expired") {
+                    alert("Ваш пароль устарел. Смените его.");
+                    window.location.href = "change_password.php";
+                } else if (response === "code_required") {
+                    alert("Код отправлен на почту!");
+                    document.getElementById("codeVerification").style.display = "block";
+                } else if (response === "success") {
                     alert("Авторизация успешна!");
                     window.location.href = "user.php";
-                } else if (response.trim() === "error_invalid_code") {
-                    alert("Неверный код! Попробуйте снова.");
-                } else if (response.trim() === "error_no_stored_code") {
-                    alert("Код не был найден. Войдите заново.");
-                    window.location.href = "login.php";
                 } else {
-                    alert("⚠️ Неизвестная ошибка!");
+                    alert("Неизвестная ошибка: " + response);
                 }
             },
             error: function (xhr) {
                 console.error("Ошибка сервера:", xhr.responseText);
-                alert("Ошибка при проверке кода!");
+                loading.style.display = "none";
+                alert("Ошибка сервера!");
             }
         });
-    }
+    });
+}
+
+function VerifyCode() {
+    let _code = document.getElementsByName("_code")[0].value;
+    $.ajax({
+        url: 'ajax/verify_code.php',
+        type: 'POST',
+        data: { code: _code },
+        success: function (response) {
+            console.log("Ответ сервера (verify_code.php):", response);
+            if (response.trim() === "success") {
+                alert("Авторизация успешна!");
+                document.getElementById("codeVerification").style.display = "none";
+                document.querySelector(".button[value='Войти']").disabled = true;
+                window.location.href = "user.php";
+            } else if (response.trim() === "error_invalid_code") {
+                alert("Неверный код! Попробуйте снова.");
+            } else if (response.trim() === "error_no_stored_code") {
+                alert("Код не был найден. Войдите заново.");
+                window.location.href = "login.php";
+            } else if (response.trim() === "error_expired_code") {
+                alert("Код истек. Войдите заново.");
+                window.location.href = "login.php";
+            } else {
+                alert("⚠️ Неизвестная ошибка!");
+            }
+        },
+        error: function (xhr) {
+            console.error("Ошибка сервера:", xhr.responseText);
+            alert("Ошибка при проверке кода!");
+        }
+    });
+}
 			
 		</script>
 	</body>

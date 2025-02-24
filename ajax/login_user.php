@@ -5,18 +5,13 @@ if (!isset($_COOKIE[session_name()])) {
     exit;
 }
 include __DIR__ . '/../settings/connect_datebase.php';
-
-// Подключаем файлы PHPMailer из локальной директории, которая находится на уровень выше
 require __DIR__ . '/../PHPMailer-master/src/PHPMailer.php';
 require __DIR__ . '/../PHPMailer-master/src/SMTP.php';
 require __DIR__ . '/../PHPMailer-master/src/Exception.php';
-
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
-
 $N_DAYS = 30;
 $MAX_DISTANCE = 50;
-
 $login     = trim($_POST['login']);
 $password  = $_POST['password'];
 $latitude  = isset($_POST['latitude']) ? floatval($_POST['latitude']) : null;
@@ -37,6 +32,7 @@ if (!$id || !password_verify($password, $hashed_password)) {
     echo "error";
     exit;
 }
+
 // Проверяем, истёк ли срок действия пароля
 $today        = new DateTime();
 $passwordDate = new DateTime($password_changed_at);
@@ -46,12 +42,13 @@ if ($interval >= $N_DAYS) {
     echo "expired";
     exit;
 }
+
 // Функция для вычисления расстояния между координатами (в км)
 function getDistance($lat1, $lon1, $lat2, $lon2) {
     $R    = 6371;
     $dLat = deg2rad($lat2 - $lat1);
     $dLon = deg2rad($lon2 - $lon1);
-    $a    = sin($dLat/2) * sin($dLat/2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon/2) * sin($dLon/2);
+    $a    = sin($dLat / 2) * sin($dLat / 2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) * sin($dLon / 2);
     $c    = 2 * atan2(sqrt($a), sqrt(1 - $a));
     return $R * $c;
 }
@@ -63,9 +60,9 @@ if (!is_null($last_lat) && !is_null($last_lon) && !is_null($latitude) && !is_nul
         $verification_needed = true;
     }
 }
+
 session_regenerate_id(true);
 $new_session_token = session_id();
-
 $_SESSION['user']          = $id;
 $_SESSION['session_token'] = $new_session_token;
 
@@ -78,9 +75,10 @@ if (!is_null($latitude) && !is_null($longitude) && $latitude !== 0.0 && $longitu
 }
 
 if ($verification_needed) {
-        $code = rand(100000, 999999);
+    $code = rand(100000, 999999);
     $_SESSION['auth_code']    = $code;
     $_SESSION['pending_user'] = $id;
+    $_SESSION['auth_code_time'] = time(); // Сохраняем время генерации кода
     
     $mail = new PHPMailer(true);
     try {
@@ -91,25 +89,29 @@ if ($verification_needed) {
         $mail->Password   = 'wknismlzsruqcpyo';
         $mail->SMTPSecure = 'ssl';
         $mail->Port       = 465;
-    
+        
         $mail->CharSet    = 'UTF-8';
         $mail->Encoding   = 'base64';
-    
+        
         $mail->setFrom('Hoze-Doze@yandex.ru', 'Админ');
         $mail->addAddress($login);
-    
+        
         $mail->isHTML(true);
         $mail->Subject = 'Код авторизации';
         $mail->Body    = 'Ваш код авторизации: <b>' . $code . '</b>';
         $mail->AltBody = 'Ваш код авторизации: ' . $code;
-    
+        
         $mail->send();
-    
+        
         echo "code_required";
+        exit;
     } catch (Exception $e) {
         echo "error: " . $mail->ErrorInfo;
+        exit;
     }
 } else {
+    $_SESSION['authorized'] = true;
     echo "success";
+    exit;
 }
 ?>

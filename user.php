@@ -2,6 +2,7 @@
 session_start();
 include("./settings/connect_datebase.php");
 
+
 if (!isset($_SESSION['user'])) {
     header("Location: login.php");
     exit();
@@ -9,6 +10,13 @@ if (!isset($_SESSION['user'])) {
 if (!isset($_SESSION['session_token'])) {
     header("Location: login.php");
     exit();
+}
+if (!isset($_SESSION['authorized'])) {
+    session_unset(); // Удаляем все данные сессии
+    session_destroy(); // Уничтожаем сессию
+    session_start(); // Создаем новую сессию
+    echo "Не введён код с почты";
+    exit;
 }
 $user_id = $_SESSION['user'];
 $current_session_token = $_SESSION['session_token'];
@@ -35,6 +43,7 @@ if ($user_roll == 1) {
     header("Location: login.php");
     exit();
 }
+
 ?>
 <!DOCTYPE HTML>
 <html>
