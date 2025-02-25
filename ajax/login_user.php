@@ -1,117 +1,81 @@
 <?php
 session_start();
-if (!isset($_COOKIE[session_name()])) {
-    echo "error: cookies_required";
+header('Content-Type: application/json');
+include(__DIR__ . "/../settings/connect_datebase.php");
+require __DIR__ . "/../recaptcha/autoload.php"; 
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ob_clean();
+$secretKey = "6LcDReAqAAAAAH5U_HqwhzqcOiNffQ00drK0qL8B";
+if (!isset($_POST['g-recaptcha-response']) || empty($_POST['g-recaptcha-response'])) {
+    echo json_encode(["status" => "error", "message" => "Ошибка: reCAPTCHA не была отправлена."]);
     exit;
 }
-include __DIR__ . '/../settings/connect_datebase.php';
-require __DIR__ . '/../PHPMailer-master/src/PHPMailer.php';
-require __DIR__ . '/../PHPMailer-master/src/SMTP.php';
-require __DIR__ . '/../PHPMailer-master/src/Exception.php';
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-$N_DAYS = 30;
-$MAX_DISTANCE = 50;
-$login     = trim($_POST['login']);
-$password  = $_POST['password'];
-$latitude  = isset($_POST['latitude']) ? floatval($_POST['latitude']) : null;
-$longitude = isset($_POST['longitude']) ? floatval($_POST['longitude']) : null;
+$response = file_get_contents("https://www.google.com/recaptcha/api/siteverify?secret=$secretKey&response=" . $_POST['g-recaptcha-response'] . "&remoteip=" . $_SERVER['REMOTE_ADDR']);
+$responseKeys = json_decode($response, true);
 
-// Проверяем пользователя в базе по email (поле login)
-$query = $mysqli->prepare("SELECT id, password, password_changed_at, last_latitude, last_longitude FROM users WHERE login = ?");
-if (!$query) {
-    die("Ошибка подготовки запроса: " . $mysqli->error); 
-}
-$query->bind_param("s", $login);
-$query->execute();
-$query->bind_result($id, $hashed_password, $password_changed_at, $last_lat, $last_lon);
-$query->fetch();
-$query->close();
-
-if (!$id || !password_verify($password, $hashed_password)) {
-    echo "error";
+if (!$responseKeys["success"]) {
+    echo json_encode(["status" => "error", "message" => "Ошибка: reCAPTCHA не пройдена."]);
     exit;
 }
 
-// Проверяем, истёк ли срок действия пароля
-$today        = new DateTime();
-$passwordDate = new DateTime($password_changed_at);
-$interval     = $today->diff($passwordDate)->days;
-if ($interval >= $N_DAYS) {
-    $_SESSION['user'] = $id;
-    echo "expired";
+$login = trim($_POST['login'] ?? '');
+$password = trim($_POST['password'] ?? '');
+
+if (empty($login) || empty($password)) {
+    echo json_encode(["status" => "error", "message" => "Ошибка: Заполните все поля."]);
     exit;
 }
 
-// Функция для вычисления расстояния между координатами (в км)
-function getDistance($lat1, $lon1, $lat2, $lon2) {
-    $R    = 6371;
-    $dLat = deg2rad($lat2 - $lat1);
-    $dLon = deg2rad($lon2 - $lon1);
-    $a    = sin($dLat / 2) * sin($dLat / 2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) * sin($dLon / 2);
-    $c    = 2 * atan2(sqrt($a), sqrt(1 - $a));
-    return $R * $c;
+$result = $mysqli->query("SHOW COLUMNS FROM users LIKE 'role'");
+$roleExists = $result->num_rows > 0;
+$result->free();
+
+
+if ($roleExists) {
+    $stmt = $mysqli->prepare("SELECT id, password, role FROM users WHERE login = ?");
+} else {
+    $stmt = $mysqli->prepare("SELECT id, password FROM users WHERE login = ?");
 }
 
-$verification_needed = false;
-if (!is_null($last_lat) && !is_null($last_lon) && !is_null($latitude) && !is_null($longitude)) {
-    $distance = getDistance($latitude, $longitude, $last_lat, $last_lon);
-    if ($distance > $MAX_DISTANCE) {
-        $verification_needed = true;
+if (!$stmt) {
+    error_log("Ошибка запроса: " . $mysqli->error);
+    echo json_encode(["status" => "error", "message" => "Ошибка базы данных."]);
+    exit;
+}
+
+$stmt->bind_param("s", $login);
+$stmt->execute();
+$stmt->store_result();
+
+if ($stmt->num_rows === 1) {
+    if ($roleExists) {
+        $stmt->bind_result($id, $hashed_password, $role);
+    } else {
+        $stmt->bind_result($id, $hashed_password);
+        $role = 0; 
     }
-}
 
-session_regenerate_id(true);
-$new_session_token = session_id();
-$_SESSION['user']          = $id;
-$_SESSION['session_token'] = $new_session_token;
+    $stmt->fetch();
 
-// Обновляем координаты и session_token в базе для данного пользователя
-if (!is_null($latitude) && !is_null($longitude) && $latitude !== 0.0 && $longitude !== 0.0) {
-    $query = $mysqli->prepare("UPDATE users SET last_latitude = ?, last_longitude = ?, session_token = ? WHERE id = ?");
-    $query->bind_param("ddsi", $latitude, $longitude, $new_session_token, $id);
-    $query->execute();
-    $query->close();
-}
+   
+    if (strlen($hashed_password) < 60) {
+        $isPasswordCorrect = ($password === $hashed_password); 
+    } else {
+        $isPasswordCorrect = password_verify($password, $hashed_password); 
+    }
 
-if ($verification_needed) {
-    $code = rand(100000, 999999);
-    $_SESSION['auth_code']    = $code;
-    $_SESSION['pending_user'] = $id;
-    $_SESSION['auth_code_time'] = time(); // Сохраняем время генерации кода
-    
-    $mail = new PHPMailer(true);
-    try {
-        $mail->isSMTP();
-        $mail->Host       = 'smtp.yandex.ru';
-        $mail->SMTPAuth   = true;
-        $mail->Username   = 'Hoze-Doze@yandex.ru';
-        $mail->Password   = 'wknismlzsruqcpyo';
-        $mail->SMTPSecure = 'ssl';
-        $mail->Port       = 465;
-        
-        $mail->CharSet    = 'UTF-8';
-        $mail->Encoding   = 'base64';
-        
-        $mail->setFrom('Hoze-Doze@yandex.ru', 'Админ');
-        $mail->addAddress($login);
-        
-        $mail->isHTML(true);
-        $mail->Subject = 'Код авторизации';
-        $mail->Body    = 'Ваш код авторизации: <b>' . $code . '</b>';
-        $mail->AltBody = 'Ваш код авторизации: ' . $code;
-        
-        $mail->send();
-        
-        echo "code_required";
-        exit;
-    } catch (Exception $e) {
-        echo "error: " . $mail->ErrorInfo;
-        exit;
+    if ($isPasswordCorrect) {
+        $_SESSION['user'] = $id;
+        $redirect_url = ($role == 1) ? "admin.php" : "user.php";
+        echo json_encode(["status" => "success", "redirect" => $redirect_url]);
+    } else {
+        echo json_encode(["status" => "error", "message" => "Ошибка: Неверный логин или пароль."]);
     }
 } else {
-    $_SESSION['authorized'] = true;
-    echo "success";
-    exit;
+    echo json_encode(["status" => "error", "message" => "Ошибка: Пользователь не найден."]);
 }
+
+$stmt->close();
+$mysqli->close();
 ?>
